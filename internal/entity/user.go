@@ -2,8 +2,8 @@ package entity
 
 // User represents a user.
 type User struct {
-    ID   string
-    Name string
+    ID   string `json:"id"`
+    Name string `json:"name"`
 }
 
 // GetID returns the user ID.

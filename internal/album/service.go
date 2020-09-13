@@ -2,10 +2,11 @@ package album
 
 import (
     "context"
-    validation "github.com/go-ozzo/ozzo-validation/v4"
+    "time"
     "veselink1/quick-draw/internal/entity"
     "veselink1/quick-draw/pkg/log"
-    "time"
+
+    validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 
 // Service encapsulates usecase logic for albums.

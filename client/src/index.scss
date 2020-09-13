@@ -1,0 +1,232 @@
+$theme-colors: (
+  // Material colors
+  "blue": #2196f3,
+  "indigo": #3f51b5,
+  "purple": #9c27b0,
+  "pink": #e91e63,
+  "red": #f44336,
+  "orange": #ff9800,
+  "yellow": #ffeb3b,
+  "green": #4caf50,
+  "teal": #009688,
+  "cyan": #00bcd4,
+  // uom color palette
+  "primary": #2196f3,
+  "secondary": #e91e63,
+  "info": #424547,
+);
+
+$gray-100: #fafafa !default;
+$gray-200: #ececed !default;
+$gray-300: #c3c4c6 !default;
+$gray-400: #a6a7ab !default;
+$gray-500: #898b90 !default;
+$gray-600: #6d6f74 !default;
+$gray-700: #525357 !default;
+$gray-800: #393a3c !default;
+$gray-900: #232325 !default;
+
+$enable-transitions: true;
+$enable-shadows: false;
+
+$border-radius: 12px;
+$border-radius-sm: 12px;
+$border-radius-lg: 12px;
+
+$input-btn-padding-y: 0.5rem;
+$input-btn-padding-x: 1.5rem;
+
+$input-btn-padding-y-sm: 0.25rem;
+$input-btn-padding-x-sm: 0.75rem;
+
+$input-btn-padding-y-lg: 0.75rem;
+$input-btn-padding-x-lg: 2rem;
+
+$font-family-sans-serif: Grandstander, sans-serif, "apple color emoji", "segoe ui emoji", "segoe ui symbol", "noto color emoji";
+
+$input-btn-focus-width: 0;
+$btn-font-weight: bold;
+
+$border-width: 1px;
+
+$navbar-nav-link-padding-x: 1rem;
+$navbar-nav-link-padding-y: 1rem;
+
+$box-shadow-size-sm: 0 0.125rem 0.25rem;
+$box-shadow-size: 0 0.5rem 1rem;
+$box-shadow-size-lg: 0 1rem 3rem;
+$box-shadow-size-xl: 0 2rem 6rem;
+
+@function colored-box-shadow-sm($color) {
+  @return 0px 3px 1px -2px rgba($color, 0.2),0px 2px 2px 0px rgba($color, 0.14),0px 1px 5px 0px rgba($color, 0.12);
+}
+
+@function colored-box-shadow($color) {
+  @return 0px 2px 4px -1px rgba($color, 0.2),0px 4px 5px 0px rgba($color, 0.14), 0px 1px 10px 0px rgba($color, 0.12);
+}
+
+@function colored-box-shadow-lg($color) {
+  @return 0px 5px 5px -3px rgba($color, 0.2), 0px 8px 10px 1px rgba($color, 0.14), 0px 3px 14px 2px rgba($color, 0.12);
+}
+
+@function colored-box-shadow-xl($color) {
+  @return 0px 8px 10px -5px rgba($color, 0.2), 0px 16px 24px 2px rgba($color, 0.14), 0px 6px 30px 5px rgba($color, 0.12);
+}
+
+$box-shadow-sm: colored-box-shadow(#000);
+$box-shadow: colored-box-shadow-sm(#000);
+$box-shadow-lg: colored-box-shadow-lg(#000);
+
+$navbar-dark-toggler-border-color: transparent;
+$navbar-light-toggler-border-color: transparent;
+
+@import '~bootstrap/scss/bootstrap.scss';
+
+@each $color, $value in $theme-colors {
+  .shadow-#{$color} {
+    box-shadow: colored-box-shadow($value);
+    &.shadow-hover:not(:disabled):not(.disabled) {
+      &:hover {
+        box-shadow: colored-box-shadow-lg($value);
+      }
+    }
+  }
+
+  .shadow-sm-#{$color} {
+    box-shadow: colored-box-shadow-sm($value);
+    &.shadow-hover:not(:disabled):not(.disabled) {
+      &:hover {
+        box-shadow: colored-box-shadow-md($value);
+      }
+    }
+  }
+
+  .shadow-lg-#{$color} {
+    box-shadow: colored-box-shadow-lg($value);
+    &.shadow-hover:not(:disabled):not(.disabled) {
+      &:hover {
+        box-shadow: colored-box-shadow-xl($value);
+      }
+    }
+  }
+
+  .btn-#{$color} {
+    border-bottom: 4px solid darken($value, 10%);
+  }
+
+  .btn-outline-#{$color} {
+    border-color: transparent;
+    background-color: rgba($value, 0.1);
+    &:not(:disabled):not(.disabled) {
+      &:hover, &:focus {
+        color: $value;
+        border-color: $value;
+        background-color: rgba($value, 0.1);
+      }
+      &:active, &.active {
+        color: $value;
+        background-color: rgba($value, 0.2);
+      }
+    }
+  }
+}
+
+.navbar-nav {
+  .navbar-brand {
+    font-weight: bold;
+  }
+}
+
+.nav-pills {
+  @extend .rounded;
+  padding: 0.25rem;
+  background-color: $gray-100;
+}
+
+.nav-pills .nav-link, .nav-pills .show > .nav-link {
+  font-weight: bold;
+  transition: $btn-transition;
+  color: $gray-500;
+  padding: 0.25rem 1rem;
+
+  &:disabled, &.disabled {
+    color: $gray-300;
+  }
+}
+
+.list-group-item.active, .nav-pills .nav-link.active, .nav-pills .show > .nav-link {
+  color: black;
+  background-color: white;
+}
+
+.page-item.active .page-link {
+  box-shadow: colored-box-shadow(map-get($theme-colors, 'primary'));
+}
+
+.qd-text-outline {
+  text-shadow:
+    -0.5px -0.5px 0 #000,
+    0.5px -0.5px 0 #000,
+    -0.5px 0.5px 0 #000,
+    0.5px 0.5px 0 #000;
+
+  @supports (-webkit-text-stroke: 1px black) {
+      -webkit-text-stroke: 0.5px black;
+      text-shadow: none;
+  }
+}
+
+.qd-text-title {
+  font-family: Grandstander, sans-serif;
+  font-weight: 700;
+}
+
+.qd-hidden {
+  display: none;
+}
+
+@keyframes qd-show-anim {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.qd-show {
+  display: block;
+  animation: qd-show-anim 0.2s ease-in-out 0s 1 forwards forwards;
+}
+
+.qd-hide {
+  display: block;
+  animation: qd-show-anim 0.2s ease-in-out 0s 1 forwards forwards;
+}
+
+.qd-backdrop {
+  background-color: rgba(black, 0.2);
+  background-image: radial-gradient(rgba(black, 0.2), transparent);
+}
+
+.qd-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.qd-overlay > * {
+  pointer-events: initial;
+}
+
+#root {
+  background-color: #fafafa;
+  background-image: url('/img/bg.png');
+  background-size: contain;
+  background-position: top center;
+  background-repeat: no-repeat;
+}
