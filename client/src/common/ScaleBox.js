@@ -12,7 +12,7 @@ export default function ScaleBox({ children, ...props }) {
             setTick(tick + 1);
         }, 50);
         return () => clearInterval(interval);
-    });
+    }, []);
 
     useLayoutEffect(() => {
         setScale([container.current.clientWidth / holder.current.clientWidth, container.current.clientHeight / holder.current.clientHeight]);

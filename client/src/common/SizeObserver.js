@@ -14,7 +14,7 @@ export default function SizeObserver({ children, ...props }) {
             setTick(tick + 1);
         }, 50);
         return () => clearInterval(interval);
-    });
+    }, []);
 
     useLayoutEffect(() => {
         setClientWidth(holder.current.clientWidth);

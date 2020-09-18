@@ -8,7 +8,14 @@ export default function RoomListOptions({ selectedRoom, onJoinPressed, onCreateP
         <div className="d-flex flex-column align-items-center justify-content-around">
             <div className="text-center">
                 <div className="display-4 text-orange qd-text-outline qd-text-title">
-                    Quick, <span className="text-pink">D</span><span className="text-teal">R</span><span className="text-indigo">A</span><span className="text-yellow">W</span>!
+                    Guess the{' '}
+                    <span className="text-pink">D</span>
+                    <span className="text-teal">R</span>
+                    <span className="text-indigo">A</span>
+                    <span className="text-yellow">W</span>
+                    <span className="text-cyan">I</span>
+                    <span className="text-red">N</span>
+                    <span className="text-green">G</span>!
                 </div>
                 by Veselin Karaganev
             </div>

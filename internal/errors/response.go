@@ -11,6 +11,7 @@ type ErrorResponse struct {
     Status  int         `json:"status"`
     Message string      `json:"message"`
     Details interface{} `json:"details,omitempty"`
+    NoBody  bool        `json:"-"`
 }
 
 // Error is required by the error interface.
@@ -21,6 +22,18 @@ func (e ErrorResponse) Error() string {
 // StatusCode is required by routing.HTTPError interface.
 func (e ErrorResponse) StatusCode() int {
     return e.Status
+}
+
+// NotModified creates a new error response representing an resource that has not been modified (HTTP 304)
+func NotModified(msg string) ErrorResponse {
+    if msg == "" {
+        msg = "Resource has not been modified."
+    }
+    return ErrorResponse{
+        Status:  http.StatusNotModified,
+        Message: msg,
+        NoBody: true,
+    }
 }
 
 // InternalServerError creates a new error response representing an internal server error (HTTP 500)

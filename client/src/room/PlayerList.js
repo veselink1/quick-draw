@@ -1,16 +1,17 @@
 import React from 'react';
 import moment from 'moment';
 
-export default function PlayerList({ players, turnPlayer }) {
+export default function PlayerList({ players, turnPlayer, scores }) {
     return (
-        <div className="table-responsive">
-            <table className="table table-sm table-striped table-hover table-pink">
+        <div>
+            <table className="table table-sm table-hover">
                 <tbody>
                     {players.map(player => (
                         <PlayerItem
                             key={player.id}
                             player={player}
                             isCurrent={turnPlayer === player}
+                            score={scores ? scores[player.id] || 0 : null}
                         />
                     ))}
                 </tbody>
@@ -19,21 +20,25 @@ export default function PlayerList({ players, turnPlayer }) {
     );
 }
 
-function PlayerItem({ player, isCurrent }) {
+function PlayerItem({ player, isCurrent, score }) {
     const { id, name } = player;
     const className = isCurrent
-        ? 'table-indigo text-center'
+        ? 'table-pink text-center'
         : 'text-center';
     return (
         <tr className={className}>
-            <td className="text-truncate">
-                <span class="oi oi-person"></span>
-            </td>
-            <td className="text-truncate">
-                {name}
+            <td className="align-middle">
+                {typeof score === 'number' ? (
+                    <span className="badge badge-orange badge-pill">{score}</span>
+                ) : (
+                    <span className="oi oi-person"></span>
+                )}
             </td>
             <td>
-                {isCurrent ? <span class="oi oi-brush"></span> : null}
+                {id}
+            </td>
+            <td className="align-middle">
+                {isCurrent ? <span className="oi oi-brush"></span> : null}
             </td>
         </tr>
     );

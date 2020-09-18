@@ -33,12 +33,12 @@ export const StateProvider = ( { children } ) => {
         case ACTIONS.END_REFRESH:
             return { ...state, rooms: action.rooms, fetching: false, error: null };
         case ACTIONS.FAIL_REFRESH:
-            return { ...state, rooms: action.rooms, fetching: false, error: action.error };
+            return { ...state, fetching: false, error: action.error };
 
         case ACTIONS.BEGIN_CREATE_ROOM:
             return { ...state, fetching: true, error: null };
         case ACTIONS.END_CREATE_ROOM:
-            return { ...state, rooms: [action.room, ...state.rooms], fetching: false, error: null };
+            return { ...state, fetching: false, error: null };
         case ACTIONS.FAIL_CREATE_ROOM:
             return { ...state, fetching: false, error: action.error };
 
@@ -60,10 +60,10 @@ export const StateProvider = ( { children } ) => {
     return <Provider value={[state, dispatch]}>{children}</Provider>;
 };
 
-export async function refreshRoomsAsync(dispatch) {
+export async function refreshRoomsAsync(dispatch, token) {
     dispatch({ type: ACTIONS.BEGIN_REFRESH });
     try {
-        const rooms = await api.getRoomListAsync();
+        const rooms = await api.getRoomListAsync(token);
         dispatch({ type: ACTIONS.END_REFRESH, rooms });
         return rooms;
     } catch (e) {
@@ -80,6 +80,17 @@ export async function createRoomAsync(dispatch, token) {
         return room;
     } catch (e) {
         dispatch({ type: ACTIONS.FAIL_CREATE_ROOM, error: { message: `Couldn't create room (Reason: ${e.message})` } });
+        console.error(e);
+    }
+}
+
+export async function joinRoomAsync(dispatch, token, id) {
+    dispatch({ type: ACTIONS.BEGIN_CREATE_ROOM });
+    try {
+        await api.joinRoomAsync(token, id, '');
+        dispatch({ type: ACTIONS.END_CREATE_ROOM });
+    } catch (e) {
+        dispatch({ type: ACTIONS.FAIL_CREATE_ROOM, error: { message: `Couldn't join room (Reason: ${e.message})` } });
         console.error(e);
     }
 }

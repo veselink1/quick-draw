@@ -26,6 +26,10 @@ function Room({ match, ...rest }) {
     const history = useHistory();
 
     useEffect(() => {
+        if (!authState.token) {
+            history.push('/');
+            return;
+        }
         refreshRoomAsync(dispatch, authState.token, id);
     }, []);
 
@@ -68,7 +72,8 @@ function Room({ match, ...rest }) {
         }
     }
 
-    const isCurrentPlayerTurn = state.room && state.room.turnPlayer && state.room.turnPlayer.id === authState.user.id;
+    const isGameStarted = state.room && state.room.turnPlayer;
+    const player = isGameStarted && state.room.players.find(p => p.id === authState.user.id);
 
     return (
         <div className="d-flex container flex-fill">
@@ -85,13 +90,14 @@ function Room({ match, ...rest }) {
                                 <PlayerList
                                     players={state.room.players}
                                     turnPlayer={state.room.turnPlayer}
+                                    scores={state.room.state.scores}
                                 />
                             )}
                         </div>
                     </div>
                     <div className="col-md-8 col-lg-10 d-flex justify-content-center">
-                        {state.room && (
-                            <GameScreen room={state.room} isCurrentPlayerTurn={isCurrentPlayerTurn} />
+                        {isGameStarted && (
+                            <GameScreen player={player} room={state.room} />
                         )}
                     </div>
                 </div>
@@ -129,7 +135,7 @@ function StartGameModal({ players, onStartPressed }) {
                         </div>
                     </div>
                     <div className="modal-footer">
-                        <button type="button" className="btn btn-primary" onClick={onStartPressed}>
+                        <button type="button" className="btn btn-primary" onClick={onStartPressed} disabled={players.length < 2}>
                             Start
                         </button>
                     </div>

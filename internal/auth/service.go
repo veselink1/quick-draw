@@ -14,6 +14,7 @@ type Service interface {
     // authenticate authenticates a user using username and password.
     // It returns a JWT token if authentication succeeds. Otherwise, an error is returned.
     Login(ctx context.Context, username, password string) (string, error)
+    LoginWithIdentity(ctx context.Context, user Identity) (string, error)
 }
 
 // Identity represents an authenticated user identity.
@@ -42,6 +43,10 @@ func (s service) Login(ctx context.Context, username, password string) (string, 
         return s.generateJWT(identity)
     }
     return "", errors.Unauthorized("")
+}
+
+func (s service) LoginWithIdentity(ctx context.Context, user Identity) (string, error) {
+    return s.generateJWT(user)
 }
 
 // authenticate authenticates a user using username and password.

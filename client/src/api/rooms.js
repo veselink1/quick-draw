@@ -1,17 +1,12 @@
-const ROOT_URL = 'http://localhost:8080/v1';
-
-class APIError extends Error {
-    constructor(message, response) {
-        super(message);
-        this.response = response;
-        this.status = response.status;
-    }
-}
+import { APIError } from '../utils/api';
+import { toQueryString } from '../utils/requests';
+import { API_ROOT_URL } from '../config/constants';
 
 function createPlayer(data) {
     return {
         id: data.id,
         name: data.name,
+        state: data.state,
     };
 }
 
@@ -29,17 +24,39 @@ function createRoom(data) {
     };
 }
 
-export async function getRoomAsync(id) {
-    const res = await fetch(`${ROOT_URL}/rooms/${id}`);
-    if (res.status !== 200) {
+let lastRefresh = {
+    id: '',
+    refreshedAt: 0,
+    room: null,
+};
+
+export async function getRoomAsync(token, id) {
+    const lastRefreshAt = lastRefresh.id === id
+        ? lastRefresh.refreshedAt
+        : 0;
+    const query = toQueryString({ last_refresh_at: lastRefreshAt });
+    const res = await fetch(`${API_ROOT_URL}/rooms/${id}?${query}`, {
+        headers: {
+            'authorization': 'Bearer ' + token,
+            'content-type': 'application/json',
+        },
+    });
+    if (res.status === 304) {
+        return lastRefresh.room;
+    } else if (res.status !== 200) {
         throw new APIError('Failed to get room', res);
     }
-    const room = await res.json();
-    return createRoom(room);
+    const room = createRoom(await res.json());
+    lastRefresh = {
+        id,
+        refreshedAt: (Date.now() / 1000) | 0,
+        room,
+    };
+    return room;
 }
 
 export async function leaveRoomAsync(token, id) {
-    const res = await fetch(`${ROOT_URL}/rooms/${id}`, {
+    const res = await fetch(`${API_ROOT_URL}/rooms/${id}`, {
         method: 'DELETE',
         mode: 'cors',
         headers: {
@@ -52,7 +69,7 @@ export async function leaveRoomAsync(token, id) {
 }
 
 export async function freezeRoomAsync(token, id) {
-    const res = await fetch(`${ROOT_URL}/rooms/${id}/freeze`, {
+    const res = await fetch(`${API_ROOT_URL}/rooms/${id}/freeze`, {
         method: 'PUT',
         mode: 'cors',
         headers: {
@@ -65,7 +82,7 @@ export async function freezeRoomAsync(token, id) {
 }
 
 export async function setRoomStateAsync(token, id, state) {
-    const res = await fetch(`${ROOT_URL}/rooms/${id}/state`, {
+    const res = await fetch(`${API_ROOT_URL}/rooms/${id}/state`, {
         method: 'PUT',
         mode: 'cors',
         headers: {
@@ -79,8 +96,43 @@ export async function setRoomStateAsync(token, id, state) {
     }
 }
 
+export async function setPlayerStateAsync(token, id, state) {
+    const res = await fetch(`${API_ROOT_URL}/rooms/${id}/player`, {
+        method: 'PUT',
+        mode: 'cors',
+        headers: {
+            'authorization': 'Bearer ' + token,
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({ state }),
+    });
+    if (res.status !== 200) {
+        throw new APIError('Failed to update player state', res);
+    }
+}
+
+export async function changeTurnPlayerAsync(token, id, playerID) {
+    const res = await fetch(`${API_ROOT_URL}/rooms/${id}/turn`, {
+        method: 'PUT',
+        mode: 'cors',
+        headers: {
+            'authorization': 'Bearer ' + token,
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({ turn_player_id: playerID }),
+    });
+    if (res.status !== 200) {
+        throw new APIError('Failed to set player', res);
+    }
+}
+
 export async function getRoomListAsync(token) {
-    const res = await fetch(`${ROOT_URL}/rooms`);
+    const res = await fetch(`${API_ROOT_URL}/rooms`, {
+        headers: {
+            'authorization': 'Bearer ' + token,
+            'content-type': 'application/json',
+        },
+    });
     if (res.status !== 200) {
         throw new APIError('Failed to get room list', res);
     }
@@ -89,7 +141,7 @@ export async function getRoomListAsync(token) {
 }
 
 export async function createRoomAsync(token) {
-    const res = await fetch(`${ROOT_URL}/rooms`, {
+    const res = await fetch(`${API_ROOT_URL}/rooms`, {
         method: 'POST',
         mode: 'cors',
         headers: {
@@ -108,8 +160,28 @@ export async function createRoomAsync(token) {
     return createRoom(room);
 }
 
+export async function joinRoomAsync(token, id, passcode) {
+    const res = await fetch(`${API_ROOT_URL}/rooms/${id}`, {
+        method: 'PUT',
+        mode: 'cors',
+        headers: {
+            'authorization': 'Bearer ' + token,
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+            'passcode': passcode,
+        }),
+    });
+
+    const room = await res.json();
+    if (res.status !== 201) {
+        throw new APIError(room.message || 'Failed to join room', res);
+    }
+    return {};
+}
+
 export async function leavePreviousAsync(token) {
-    const res = await fetch(`${ROOT_URL}/rooms`, {
+    const res = await fetch(`${API_ROOT_URL}/rooms`, {
         method: 'DELETE',
         mode: 'cors',
         headers: {

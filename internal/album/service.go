@@ -73,7 +73,7 @@ func (s service) Create(ctx context.Context, req CreateAlbumRequest) (Album, err
         return Album{}, err
     }
     id := entity.GenerateID()
-    now := time.Now()
+    now := time.Now().UTC()
     err := s.repo.Create(ctx, entity.Album{
         ID:        id,
         Name:      req.Name,
@@ -97,7 +97,7 @@ func (s service) Update(ctx context.Context, id string, req UpdateAlbumRequest) 
         return album, err
     }
     album.Name = req.Name
-    album.UpdatedAt = time.Now()
+    album.UpdatedAt = time.Now().UTC()
 
     if err := s.repo.Update(ctx, album.Album); err != nil {
         return album, err

@@ -9,6 +9,7 @@ import (
     dbx "github.com/go-ozzo/ozzo-dbx"
     "database/sql"
     "encoding/json"
+    "time"
 )
 
 // Repository encapsulates the logic to access room from the data source.
@@ -31,6 +32,8 @@ type Repository interface {
     AddPlayer(ctx context.Context, roomID string, player entity.Player) error
     // Remove the user from the room.
     RemovePlayer(ctx context.Context, roomID string, userID string) error
+    // Sets the user's state.
+    SetPlayerState(ctx context.Context, roomID string, userID string, state interface{}) error
 }
 
 // repository persists rooms in database
@@ -50,30 +53,42 @@ func scanRoomAndPlayers(rows *dbx.Rows) (entity.Room, error) {
 
     var nullPlayerID sql.NullString
     var nullPlayerName sql.NullString
-    err := rows.Scan(
-        &room.ID,
-        &room.OwnerID,
-        &room.TurnPlayerID,
-        &room.Frozen,
-        &room.CreatedAt,
-        &room.UpdatedAt,
-        &stateJSON,
-        &nullPlayerID,
-        &nullPlayerName,
-    )
-    if err != nil {
-        return entity.Room{}, err
+    var nullPlayerState sql.NullString
+    isFirstCall := true
+
+    for isFirstCall || rows.Next() {
+        isFirstCall = false
+        err := rows.Scan(
+            &room.ID,
+            &room.OwnerID,
+            &room.TurnPlayerID,
+            &room.Frozen,
+            &room.CreatedAt,
+            &room.UpdatedAt,
+            &stateJSON,
+            &nullPlayerID,
+            &nullPlayerName,
+            &nullPlayerState,
+        )
+        if err != nil {
+            return entity.Room{}, err
+        }
+
+        // The rooms has players
+        if nullPlayerID.Valid {
+            playerID, _ := nullPlayerID.Value()
+            playerName, _ := nullPlayerName.Value()
+            playerState, _ := nullPlayerState.Value()
+            var state map[string]interface{}
+            if err := json.Unmarshal([]byte(playerState.(string)), &state); err != nil {
+                return entity.Room{}, err
+            }
+            player := entity.Player{ RoomID: room.ID, User: entity.User{ ID: playerID.(string), Name: playerName.(string) }, State: state }
+            room.Players = append(room.Players, player)
+        }
     }
 
-    // The rooms has players
-    if nullPlayerID.Valid {
-        playerID, _ := nullPlayerID.Value()
-        playerName, _ := nullPlayerName.Value()
-        player := entity.Player{ User: entity.User{ ID: playerID.(string), Name: playerName.(string) } }
-        room.Players = append(room.Players, player)
-    }
-
-    err = json.Unmarshal(stateJSON, &room.State)
+    err := json.Unmarshal(stateJSON, &room.State)
     if err != nil {
         return *room, err
     }
@@ -115,10 +130,10 @@ func scanRoomNoPlayersNoState(rows *dbx.Rows) (entity.Room, error) {
 func (r repository) Get(ctx context.Context, id string) (entity.Room, error) {
     db := r.db.With(ctx)
     query := db.NewQuery(`
-        SELECT r.id, r.owner_id, r.turn_player_id, r.frozen, r.created_at, r.updated_at, r.state, p.id, p.name
+        SELECT r.id, r.owner_id, r.turn_player_id, r.frozen, r.created_at, r.updated_at, r.state, p.id, p.name, p.state
         FROM room as r
         LEFT JOIN player as p ON r.id = p.room_id
-        WHERE r.id = {:id} LIMIT 1
+        WHERE r.id = {:id}
     `)
     query.Bind(dbx.Params{ "id": id })
 
@@ -138,10 +153,10 @@ func (r repository) Get(ctx context.Context, id string) (entity.Room, error) {
 func (r repository) FindByUser(ctx context.Context, userID string) (entity.Room, bool, error) {
     db := r.db.With(ctx)
     query := db.NewQuery(`
-        SELECT r.id, r.owner_id, r.turn_player_id, r.frozen, r.created_at, r.updated_at, r.state, p.id, p.name
+        SELECT r.id, r.owner_id, r.turn_player_id, r.frozen, r.created_at, r.updated_at, r.state, p.id, p.name, p.state
         FROM room as r
         LEFT JOIN player as p ON r.id = p.room_id
-        WHERE p.id = {:id} LIMIT 1
+        WHERE p.id = {:id}
     `)
     query.Bind(dbx.Params{ "id": userID })
 
@@ -189,21 +204,22 @@ func (r repository) Create(ctx context.Context, room entity.Room, player entity.
     return err
 }
 
+func (r repository) updateTimestamp(ctx context.Context, roomID string) error {
+    updateRoom := r.db.With(ctx).NewQuery(`
+        UPDATE room
+        SET updated_at = {:updated_at}
+        WHERE room.id = {:id}
+    `)
+    updateRoom.Bind(dbx.Params{
+        "id": roomID,
+        "updated_at": time.Now().UTC(),
+    })
+    _, err := updateRoom.Execute()
+    return err
+}
+
 // Update saves the changes to a room in the database.
 func (r repository) Update(ctx context.Context, room entity.Room) error {
-    // query := r.db.With(ctx).NewQuery(`
-    //     SELECT r.state
-    //     FROM room as r
-    //     WHERE r.id = {:id}
-    // `)
-    // query.Bind(dbx.Params{ "id": room.ID })
-
-    // var mergedState map[string]interface{}
-    // query.Row(&mergedState)
-    // for k, v := range room.State {
-    //     mergedState[k] = v
-    // }
-
     updateRoom := r.db.With(ctx).NewQuery(`
         UPDATE room
         SET created_at = {:created_at}, frozen = {:frozen},
@@ -222,7 +238,7 @@ func (r repository) Update(ctx context.Context, room entity.Room) error {
         "frozen": room.Frozen,
         "owner_id": room.OwnerID,
         "state": stateJSON,
-        "updated_at": room.UpdatedAt,
+        "updated_at": time.Now().UTC(),
         "turn_player_id": room.TurnPlayerID,
     })
     _, err = updateRoom.Execute()
@@ -282,36 +298,71 @@ func (r repository) AddPlayer(ctx context.Context, roomID string, player entity.
         return errors.Forbidden("")
     }
 
-    _, err = r.db.With(ctx).Insert("player", dbx.Params{
-        "id": player.ID,
-        "name": player.Name,
-        "room_id": roomID,
-    }).Execute()
+    err = r.db.Transactional(ctx, func(ctx context.Context) error {
+        _, err := r.db.With(ctx).Insert("player", dbx.Params{
+            "id": player.ID,
+            "name": player.Name,
+            "room_id": room.ID,
+        }).Execute()
+        if err != nil {
+            return err
+        }
 
-    if err != nil {
-        return err
-    }
-    return nil
+        err = r.updateTimestamp(ctx, roomID)
+        if err != nil {
+            return err
+        }
+        return nil
+    })
+
+    return err
 }
 
 // Remove the user from the room.
 func (r repository) RemovePlayer(ctx context.Context, roomID string, userID string) error {
-    room, err := r.Get(ctx, roomID)
-    if err != nil {
-        return err
-    }
+    err := r.db.Transactional(ctx, func(ctx context.Context) error {
+        _, err := r.db.With(ctx).Delete(
+            "player",
+            dbx.NewExp("id={:id}", dbx.Params{"id": userID}),
+        ).Execute()
+        if err != nil {
+            return err
+        }
 
-    if room.Frozen {
-        return errors.Forbidden("")
-    }
+        err = r.updateTimestamp(ctx, roomID)
+        if err != nil {
+            return err
+        }
+        return nil
+    })
 
-    _, err = r.db.With(ctx).Delete(
-        "player",
-        dbx.NewExp("id={:id}", dbx.Params{"id": userID}),
-    ).Execute()
+    return err
+}
 
-    if err != nil {
-        return err
-    }
-    return nil
+func (r repository) SetPlayerState(ctx context.Context, roomID string, playerID string, state interface{}) error {
+    err := r.db.Transactional(ctx, func(ctx context.Context) error {
+        updatePlayer := r.db.With(ctx).NewQuery(`
+            UPDATE player
+            SET state = {:state}
+            WHERE player.id = {:id} AND player.room_id = {:room_id}
+        `)
+
+        stateJSON, err := json.Marshal(state)
+        if err != nil {
+            return err
+        }
+        updatePlayer.Bind(dbx.Params{
+            "id": playerID,
+            "room_id": roomID,
+            "state": stateJSON,
+        })
+        _, err = updatePlayer.Execute()
+
+        err = r.updateTimestamp(ctx, roomID)
+        if err != nil {
+            return err
+        }
+        return nil
+    })
+    return err
 }

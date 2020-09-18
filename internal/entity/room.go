@@ -39,4 +39,5 @@ type Room struct {
 type Player struct {
     RoomID string `json:"-"`
     User
+    State map[string]interface{} `json:"state"`
 }

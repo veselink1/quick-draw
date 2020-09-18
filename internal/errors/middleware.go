@@ -31,8 +31,10 @@ func Handler(logger log.Logger) routing.Handler {
                     l.Errorf("encountered internal server error: %v", err)
                 }
                 c.Response.WriteHeader(res.StatusCode())
-                if err = c.Write(res); err != nil {
-                    l.Errorf("failed writing error response: %v", err)
+                if !res.NoBody {
+                    if err = c.Write(res); err != nil {
+                        l.Errorf("failed writing error response: %v", err)
+                    }
                 }
                 c.Abort() // skip any pending handlers since an error has occurred
                 err = nil // return nil because the error is already handled

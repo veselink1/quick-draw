@@ -14,13 +14,14 @@ import (
 
 // Service encapsulates usecase logic for rooms.
 type Service interface {
-    Get(ctx context.Context, id string) (Room, error)
+    Get(ctx context.Context, id string, req GetRoomRequest) (Room, error)
     Query(ctx context.Context, offset, limit int) ([]Room, error)
     Count(ctx context.Context) (int, error)
     Create(ctx context.Context, input CreateRoomRequest) (Room, error)
-    Join(ctx context.Context, input JoinRoomRequest) (Room, error)
+    Join(ctx context.Context, id string, input JoinRoomRequest) (Room, error)
     Freeze(ctx context.Context, id string) (Room, error)
     SetState(ctx context.Context, id string, input SetStateRequest) (Room, error)
+    SetPlayerState(ctx context.Context, id string, input SetPlayerStateRequest) error
     ChangeTurn(ctx context.Context, id string, input ChangeTurnRequest) (Room, error)
     LeaveRoom(ctx context.Context, id string) (Room, error)
     LeaveAllRooms(ctx context.Context) error
@@ -29,6 +30,15 @@ type Service interface {
 // Room represents the data about a room
 type Room struct {
     entity.Room
+}
+
+// GetRoomRequest is used when getting a room
+type GetRoomRequest struct {
+    LastRefreshAt time.Time `json:"last_refresh_at"`
+}
+
+func (m GetRoomRequest) Validate() error {
+    return nil
 }
 
 // CreateRoomRequest is used when creating a room
@@ -44,13 +54,11 @@ func (m CreateRoomRequest) Validate() error {
 
 // JoinRoomRequest is used when joining a room
 type JoinRoomRequest struct {
-    RoomID string `json:"room"`
     Passcode string `json:"passcode"`
 }
 
 func (m JoinRoomRequest) Validate() error {
     return validation.ValidateStruct(&m,
-        validation.Field(&m.RoomID, validation.Required, validation.Length(4, 16)),
         validation.Field(&m.Passcode, validation.NotNil, validation.Length(4, 16)),
     )
 }
@@ -61,6 +69,18 @@ type SetStateRequest struct {
 }
 
 func (m SetStateRequest) Validate() error {
+    if m.State == nil {
+        return errors.BadRequest("state cannot be null")
+    }
+    return nil
+}
+
+// SetPlayerStateRequest is used when changing a player's own state
+type SetPlayerStateRequest struct {
+    State map[string]interface{} `json:"state"`
+}
+
+func (m SetPlayerStateRequest) Validate() error {
     if m.State == nil {
         return errors.BadRequest("state cannot be null")
     }
@@ -89,10 +109,13 @@ func NewService(repo Repository, logger log.Logger) Service {
 }
 
 // Finds a room by its ID.
-func (s service) Get(ctx context.Context, id string) (Room, error) {
+func (s service) Get(ctx context.Context, id string, req GetRoomRequest) (Room, error) {
     room, err := s.repo.Get(ctx, id)
     if err != nil {
         return Room{}, err
+    }
+    if room.UpdatedAt.Before(req.LastRefreshAt) {
+        return Room{}, errors.NotModified("")
     }
     return Room{room}, nil
 }
@@ -117,7 +140,7 @@ func (s service) Create(ctx context.Context, req CreateRoomRequest) (Room, error
     }
 
     id := rand.String(5, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-    now := time.Now()
+    now := time.Now().UTC()
     err = s.repo.Create(ctx, entity.Room{
         ID: id,
         OwnerID: user.GetID(),
@@ -127,11 +150,11 @@ func (s service) Create(ctx context.Context, req CreateRoomRequest) (Room, error
     if err != nil {
         return Room{}, err
     }
-    return s.Get(ctx, id)
+    return s.Get(ctx, id, GetRoomRequest{})
 }
 
 // Joins a non-frozen room.
-func (s service) Join(ctx context.Context, req JoinRoomRequest) (Room, error) {
+func (s service) Join(ctx context.Context, id string, req JoinRoomRequest) (Room, error) {
     if err := req.Validate(); err != nil {
         return Room{}, err
     }
@@ -141,7 +164,7 @@ func (s service) Join(ctx context.Context, req JoinRoomRequest) (Room, error) {
         return Room{}, errors.Unauthorized("")
     }
 
-    room, err := s.Get(ctx, req.RoomID)
+    room, err := s.Get(ctx, id, GetRoomRequest{})
     if err != nil {
         return room, err
     }
@@ -153,7 +176,7 @@ func (s service) Join(ctx context.Context, req JoinRoomRequest) (Room, error) {
     }
 
     player := entity.Player{ User: entity.User{ ID: user.GetID(), Name: user.GetName() } }
-    if err = s.repo.AddPlayer(ctx, req.RoomID, player); err != nil {
+    if err = s.repo.AddPlayer(ctx, id, player); err != nil {
         return room, err
     }
     return room, nil
@@ -166,7 +189,7 @@ func (s service) Freeze(ctx context.Context, id string) (Room, error) {
         return Room{}, errors.Unauthorized("")
     }
 
-    room, err := s.Get(ctx, id)
+    room, err := s.Get(ctx, id, GetRoomRequest{})
     if err != nil {
         return room, err
     }
@@ -195,21 +218,52 @@ func (s service) SetState(ctx context.Context, id string, req SetStateRequest) (
         return Room{}, errors.Unauthorized("")
     }
 
-    room, err := s.Get(ctx, id)
+    room, err := s.Get(ctx, id, GetRoomRequest{})
     if err != nil {
         return room, err
     }
 
+    modified := false
     if room.Room.OwnerID != user.GetID() {
-        return room, errors.Unauthorized("Not room host")
+        for k, v := range req.State {
+            // Non-hosts can only change their own data.
+            if k == "~" + user.GetID() {
+                room.Room.State[k] = v
+                modified = true
+            }
+        }
+    } else {
+        for k, v := range req.State {
+            room.Room.State[k] = v
+            modified = true
+        }
     }
 
-    room.Room.State = req.State
-    if err := s.repo.Update(ctx, room.Room); err != nil {
-        return room, err
+    if modified {
+        if err := s.repo.Update(ctx, room.Room); err != nil {
+            return room, err
+        }
     }
 
     return room, nil
+}
+
+// Updates the state of the player.
+func (s service) SetPlayerState(ctx context.Context, id string, req SetPlayerStateRequest) (error) {
+    if err := req.Validate(); err != nil {
+        return err
+    }
+
+    user := auth.CurrentUser(ctx)
+    if user == nil {
+        return errors.Unauthorized("")
+    }
+
+    if err := s.repo.SetPlayerState(ctx, id, user.GetID(), req.State); err != nil {
+        return err
+    }
+
+    return nil
 }
 
 // Changes the turn player of the room.
@@ -223,13 +277,13 @@ func (s service) ChangeTurn(ctx context.Context, id string, req ChangeTurnReques
         return Room{}, errors.Unauthorized("")
     }
 
-    room, err := s.Get(ctx, id)
+    room, err := s.Get(ctx, id, GetRoomRequest{})
     if err != nil {
         return room, err
     }
 
     if room.Room.OwnerID != user.GetID() {
-        return room, errors.Unauthorized("Not room host")
+        return room, errors.Unauthorized("not room host")
     }
 
     if room.TurnPlayerID.Valid && room.TurnPlayerID.String == req.TurnPlayerID {
@@ -276,7 +330,7 @@ func (s service) Query(ctx context.Context, offset, limit int) ([]Room, error) {
 
 // Delete deletes the room with the specified ID.
 func (s service) LeaveRoom(ctx context.Context, id string) (Room, error) {
-    room, err := s.Get(ctx, id)
+    room, err := s.Get(ctx, id, GetRoomRequest{})
     if err != nil {
         return Room{}, err
     }

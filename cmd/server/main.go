@@ -100,7 +100,7 @@ func buildHandler(logger log.Logger, db *dbcontext.DB, cfg *config.Config) http.
 
     auth.RegisterHandlers(rg.Group(""),
         auth.NewService(cfg.JWTSigningKey, cfg.JWTExpiration, logger),
-        logger,
+        authHandler, logger,
     )
 
     return router
@@ -110,7 +110,7 @@ func buildHandler(logger log.Logger, db *dbcontext.DB, cfg *config.Config) http.
 func logDBQuery(logger log.Logger) dbx.QueryLogFunc {
     return func(ctx context.Context, t time.Duration, sql string, rows *sql.Rows, err error) {
         if err == nil {
-            logger.With(ctx, "duration", t.Milliseconds(), "sql", sql).Info("DB query successful")
+            // logger.With(ctx, "duration", t.Milliseconds(), "sql", sql).Info("DB query successful")
         } else {
             logger.With(ctx, "sql", sql).Errorf("DB query error: %v", err)
         }
@@ -121,7 +121,7 @@ func logDBQuery(logger log.Logger) dbx.QueryLogFunc {
 func logDBExec(logger log.Logger) dbx.ExecLogFunc {
     return func(ctx context.Context, t time.Duration, sql string, result sql.Result, err error) {
         if err == nil {
-            logger.With(ctx, "duration", t.Milliseconds(), "sql", sql).Info("DB execution successful")
+            // logger.With(ctx, "duration", t.Milliseconds(), "sql", sql).Info("DB execution successful")
         } else {
             logger.With(ctx, "sql", sql).Errorf("DB execution error: %v", err)
         }

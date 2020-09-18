@@ -8,7 +8,7 @@ export default function RoomList({ rooms, selectedRoom, onSelected, onRefreshPre
                 Press to refresh
             </button>
             <div className="table-responsive">
-                <table className="table table-sm table-striped table-hover table-pink">
+                <table className="table table-sm table-hover">
                     <tbody>
                         {rooms.map(room => (
                             <RoomItem
@@ -28,7 +28,7 @@ export default function RoomList({ rooms, selectedRoom, onSelected, onRefreshPre
 function RoomItem({ room, isSelected, onSelected }) {
     const { id, owner, createdAt } = room;
     const className = isSelected
-        ? 'table-indigo'
+        ? 'table-pink'
         : '';
     return (
         <tr className={className} onClick={() => isSelected ? onSelected(null) : onSelected(room)}>
@@ -36,7 +36,7 @@ function RoomItem({ room, isSelected, onSelected }) {
                 {id}
             </th>
             <td>
-                {owner.name}
+                {owner.id}
             </td>
             <td className="text-right">
                 {moment(createdAt).calendar()}

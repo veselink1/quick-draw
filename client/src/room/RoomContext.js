@@ -1,8 +1,11 @@
 import React, { createContext, useReducer } from 'react';
 import * as api from '../api/rooms';
+import { fromEntries } from '../utils/objects';
 
 const initialState = {
     fetching: true,
+    room: null,
+    updatedAt: 0,
 };
 
 export const store = createContext(initialState);
@@ -10,6 +13,7 @@ export const store = createContext(initialState);
 export const GAME_STAGE = {
     DRAWING: 'drawing',
     GUESSING: 'guessing',
+    SCORING: 'scoring',
 };
 
 const ACTIONS = {
@@ -28,6 +32,14 @@ const ACTIONS = {
     BEGIN_SET_STATE: 'ROOM/BEGIN_SET_STATE',
     FAIL_SET_STATE: 'ROOM/FAIL_SET_STATE',
     END_SET_STATE: 'ROOM/END_SET_STATE',
+
+    BEGIN_SET_PLAYER_STATE: 'ROOM/BEGIN_SET_PLAYER_STATE',
+    FAIL_SET_PLAYER_STATE: 'ROOM/FAIL_SET_PLAYER_STATE',
+    END_SET_PLAYER_STATE: 'ROOM/END_SET_PLAYER_STATE',
+
+    BEGIN_CHANGE_TURN: 'ROOM/BEGIN_CHANGE_TURN',
+    FAIL_CHANGE_TURN: 'ROOM/FAIL_CHANGE_TURN',
+    END_CHANGE_TURN: 'ROOM/END_CHANGE_TURN',
 };
 
 const getInitialRoomState = (stage = 'drawing') => ({
@@ -35,6 +47,7 @@ const getInitialRoomState = (stage = 'drawing') => ({
     turn: 0,
     timestamp: Date.now(),
     timeout: 30000,
+    scores: {},
 });
 
 export const StateProvider = ( { children } ) => {
@@ -61,12 +74,25 @@ export const StateProvider = ( { children } ) => {
         case ACTIONS.FAIL_START_GAME:
             return { ...state, fetching: false, error: action.error };
 
-
         case ACTIONS.BEGIN_SET_STATE:
             return { ...state, fetching: true, error: null };
         case ACTIONS.END_SET_STATE:
             return { ...state, fetching: false, error: null };
         case ACTIONS.FAIL_SET_STATE:
+                return { ...state, fetching: false, error: action.error };
+
+        case ACTIONS.BEGIN_SET_PLAYER_STATE:
+            return { ...state, fetching: true, error: null };
+        case ACTIONS.END_SET_PLAYER_STATE:
+            return { ...state, fetching: false, error: null };
+        case ACTIONS.FAIL_SET_PLAYER_STATE:
+            return { ...state, fetching: false, error: action.error };
+
+        case ACTIONS.BEGIN_CHANGE_TURN:
+            return { ...state, fetching: true, error: null };
+        case ACTIONS.END_CHANGE_TURN:
+            return { ...state, fetching: false, error: null };
+        case ACTIONS.FAIL_CHANGE_TURN:
             return { ...state, fetching: false, error: action.error };
 
         default:
@@ -81,7 +107,7 @@ export const StateProvider = ( { children } ) => {
 export async function refreshRoomAsync(dispatch, token, id) {
     dispatch({ type: ACTIONS.BEGIN_REFRESH });
     try {
-        const room = await api.getRoomAsync(id);
+        const room = await api.getRoomAsync(token, id);
         dispatch({ type: ACTIONS.END_REFRESH, room: room });
         return room;
     } catch (e) {
@@ -116,11 +142,101 @@ export async function startGameAsync(dispatch, token, id) {
 export async function updateRoomStateAsync(dispatch, token, id, state) {
     dispatch({ type: ACTIONS.BEGIN_SET_STATE });
     try {
-        const newState = Object.assign(getInitialRoomState(state.stage), state);
-        await api.setRoomStateAsync(token, id, newState);
+        await api.setRoomStateAsync(token, id, state);
         dispatch({ type: ACTIONS.END_SET_STATE });
     } catch (e) {
         dispatch({ type: ACTIONS.FAIL_SET_STATE, error: e });
         console.error(e);
+    }
+}
+
+export async function updatePlayerStateAsync(dispatch, token, id, playerID, state) {
+    dispatch({ type: ACTIONS.BEGIN_SET_PLAYER_STATE });
+    try {
+        await api.setPlayerStateAsync(token, id, state);
+        dispatch({ type: ACTIONS.END_SET_PLAYER_STATE });
+    } catch (e) {
+        dispatch({ type: ACTIONS.FAIL_SET_PLAYER_STATE, error: e });
+        console.error(e);
+    }
+}
+
+export async function changeTurnPlayerAsync(dispatch, token, id, playerID) {
+    dispatch({ type: ACTIONS.BEGIN_CHANGE_TURN });
+    try {
+        await api.changeTurnPlayerAsync(token, id, playerID);
+        dispatch({ type: ACTIONS.END_CHANGE_TURN });
+    } catch (e) {
+        dispatch({ type: ACTIONS.FAIL_CHANGE_TURN, error: e });
+        console.error(e);
+    }
+}
+
+export async function endTurnAsync(dispatch, token, room) {
+    const { turn } = room;
+    const currentPlayerIndex = room.players.findIndex(p => p.id === room.turnPlayer.id);
+    const nextPlayerIndex = (currentPlayerIndex + 1) % room.players.length;
+    changeTurnPlayerAsync(dispatch, token, room.id, room.players[nextPlayerIndex].id);
+    updateRoomStateAsync(dispatch, token, room.id, {
+        stage: GAME_STAGE.DRAWING,
+        turn: turn + 1,
+        timestamp: Date.now(),
+        timeout: 30000,
+    });
+}
+
+export async function doGameTickAsync(dispatch, token, room, player, remainingSeconds) {
+    const { stage, turn } = room;
+    if (room.owner.id === player.id) {
+        if (stage === GAME_STAGE.DRAWING) {
+            // Turn player must have submitted the image
+            const turnPlayerState = room.turnPlayer.state;
+            if (turnPlayerState && turnPlayerState.image && turnPlayerState.turn === turn) {
+                // OK, go to next stage
+                updateRoomStateAsync(dispatch, token, room.id, {
+                    stage: GAME_STAGE.GUESSING,
+                    timestamp: Date.now(),
+                    timeout: 15000,
+                });
+            } else if (remainingSeconds < 0) {
+                endTurnAsync(dispatch, token, room);
+            }
+        } else if (stage === GAME_STAGE.GUESSING) {
+            // All other players must have submitted their guesses
+            const guesses = room.players
+                .filter(p => p.id !== room.turnPlayer.id && p.state.turn === turn && typeof p.state.guess === 'string')
+                .map(p => p.state.guess);
+
+            // OK, go to next stage
+            if (guesses.length === room.players.length - 1) {
+                updateRoomStateAsync(dispatch, token, room.id, {
+                    stage: GAME_STAGE.SCORING,
+                    timestamp: Date.now(),
+                    timeout: Number.MAX_SAFE_INTEGER,
+                });
+            } else if (remainingSeconds < 0) {
+                updateRoomStateAsync(dispatch, token, room.id, {
+                    stage: GAME_STAGE.SCORING,
+                    timestamp: Date.now(),
+                    timeout: Number.MAX_SAFE_INTEGER,
+                });
+            }
+        } else if (stage === GAME_STAGE.SCORING) {
+            const additionalScores = room.turnPlayer.state.scores;
+            if (additionalScores) {
+                const newScores = fromEntries(room.players.map(p => [
+                    p.id,
+                    (room.state.scores[p.id] || 0) + (additionalScores[p.id] || 0),
+                ]));
+                updateRoomStateAsync(dispatch, token, room.id, {
+                    stage: GAME_STAGE.DRAWING,
+                    timestamp: Date.now(),
+                    timeout: 30000,
+                    scores: newScores,
+                });
+            }
+        } else {
+            throw new Error();
+        }
     }
 }
