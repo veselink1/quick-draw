@@ -1,5 +1,6 @@
 import React, { createContext, useReducer } from 'react';
 import * as api from '../api/rooms';
+import { expects } from '../utils/asserts';
 
 const initialState = {
     fetching: true,
@@ -61,6 +62,8 @@ export const StateProvider = ( { children } ) => {
 };
 
 export async function refreshRoomsAsync(dispatch, token) {
+    expects('dispatch', dispatch, 'function');
+    expects('token', token, 'number');
     dispatch({ type: ACTIONS.BEGIN_REFRESH });
     try {
         const rooms = await api.getRoomListAsync(token);
@@ -73,6 +76,8 @@ export async function refreshRoomsAsync(dispatch, token) {
 }
 
 export async function createRoomAsync(dispatch, token) {
+    expects('dispatch', dispatch, 'function');
+    expects('token', token, 'number');
     dispatch({ type: ACTIONS.BEGIN_CREATE_ROOM });
     try {
         const room = await api.createRoomAsync(token);
@@ -85,6 +90,9 @@ export async function createRoomAsync(dispatch, token) {
 }
 
 export async function joinRoomAsync(dispatch, token, id) {
+    expects('dispatch', dispatch, 'function');
+    expects('token', token, 'number');
+    expects('id', id, 'string');
     dispatch({ type: ACTIONS.BEGIN_CREATE_ROOM });
     try {
         await api.joinRoomAsync(token, id, '');
@@ -96,11 +104,13 @@ export async function joinRoomAsync(dispatch, token, id) {
 }
 
 export async function leavePreviousRoomAsync(dispatch, token) {
+    expects('dispatch', dispatch, 'function');
+    expects('token', token, 'number');
     dispatch({ type: ACTIONS.BEGIN_LEAVE_PREVIOUS });
     try {
         const room = await api.leavePreviousAsync(token);
         dispatch({ type: ACTIONS.END_LEAVE_PREVIOUS });
-        await refreshRoomsAsync(dispatch);
+        await refreshRoomsAsync(dispatch, token);
         return room;
     } catch (e) {
         dispatch({ type: ACTIONS.FAIL_LEAVE_PREVIOUS, error: { message: `Couldn't leave previous room (Reason: ${e.message})` } });

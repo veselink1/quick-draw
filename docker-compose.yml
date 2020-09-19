@@ -15,6 +15,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+  client:
+    image: client
+    command: npm start
+    build:
+      context: .
+      dockerfile: cmd/client/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+    stdin_open: true
   db:
     image: "postgres:alpine"
     restart: always
