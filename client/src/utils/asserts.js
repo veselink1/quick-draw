@@ -7,6 +7,7 @@ export function expects(name, value, type) {
         if (!(value instanceof type)) {
             throw new TypeError(`Expected ${name} to be a ${type} but is a ${Object.getPrototypeOf(value)}`);
         }
+    } else {
+        throw new Error('Incorrect usage!');
     }
-    throw new Error('Incorrect usage!');
 }

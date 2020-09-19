@@ -63,7 +63,7 @@ export const StateProvider = ( { children } ) => {
 
 export async function refreshRoomsAsync(dispatch, token) {
     expects('dispatch', dispatch, 'function');
-    expects('token', token, 'number');
+    expects('token', token, 'string');
     dispatch({ type: ACTIONS.BEGIN_REFRESH });
     try {
         const rooms = await api.getRoomListAsync(token);
@@ -77,7 +77,7 @@ export async function refreshRoomsAsync(dispatch, token) {
 
 export async function createRoomAsync(dispatch, token) {
     expects('dispatch', dispatch, 'function');
-    expects('token', token, 'number');
+    expects('token', token, 'string');
     dispatch({ type: ACTIONS.BEGIN_CREATE_ROOM });
     try {
         const room = await api.createRoomAsync(token);
@@ -91,7 +91,7 @@ export async function createRoomAsync(dispatch, token) {
 
 export async function joinRoomAsync(dispatch, token, id) {
     expects('dispatch', dispatch, 'function');
-    expects('token', token, 'number');
+    expects('token', token, 'string');
     expects('id', id, 'string');
     dispatch({ type: ACTIONS.BEGIN_CREATE_ROOM });
     try {
@@ -105,7 +105,7 @@ export async function joinRoomAsync(dispatch, token, id) {
 
 export async function leavePreviousRoomAsync(dispatch, token) {
     expects('dispatch', dispatch, 'function');
-    expects('token', token, 'number');
+    expects('token', token, 'string');
     dispatch({ type: ACTIONS.BEGIN_LEAVE_PREVIOUS });
     try {
         const room = await api.leavePreviousAsync(token);
