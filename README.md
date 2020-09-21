@@ -1,6 +1,8 @@
-# Quick, Draw!
+# Guess the Drawing!
 
 [![Build Status](https://github.com/veselink1/quick-draw/workflows/build/badge.svg)](https://github.com/qiangxue/go-rest-api/actions?query=workflow%3Abuild)
+
+Demo: https://guess-the-drawing.refs.link/
 
 > Project Template: https://github.com/qiangxue/go-rest-api
 
