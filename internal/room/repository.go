@@ -14,7 +14,7 @@ import (
 
 // Repository encapsulates the logic to access room from the data source.
 type Repository interface {
-    // Get returns the room with the specified album ID.
+    // Get returns the room with the specified room ID.
     Get(ctx context.Context, id string) (entity.Room, error)
     // Count returns the number of room.
     Count(ctx context.Context) (int, error)

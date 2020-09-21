@@ -14,7 +14,7 @@ The starter kit uses the following project layout:
 │   └── server           the API server application
 ├── config               configuration files for different environments
 ├── internal             private application and library code
-│   ├── album            album-related features
+│   ├── room             game room-related features
 │   ├── auth             authentication feature
 │   ├── config           configuration library
 │   ├── entity           entity definitions and domain logic

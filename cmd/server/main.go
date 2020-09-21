@@ -10,7 +10,6 @@ import (
     "github.com/go-ozzo/ozzo-routing/v2/content"
     "github.com/go-ozzo/ozzo-routing/v2/cors"
     _ "github.com/lib/pq"
-    "veselink1/quick-draw/internal/album"
     "veselink1/quick-draw/internal/room"
     "veselink1/quick-draw/internal/auth"
     "veselink1/quick-draw/internal/config"
@@ -87,11 +86,6 @@ func buildHandler(logger log.Logger, db *dbcontext.DB, cfg *config.Config) http.
     rg := router.Group("/v1")
 
     authHandler := auth.Handler(cfg.JWTSigningKey)
-
-    album.RegisterHandlers(rg.Group(""),
-        album.NewService(album.NewRepository(db, logger), logger),
-        authHandler, logger,
-    )
 
     room.RegisterHandlers(rg.Group(""),
         room.NewService(room.NewRepository(db, logger), logger),
